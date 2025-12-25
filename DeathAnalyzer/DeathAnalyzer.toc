@@ -1,0 +1,26 @@
+## Interface: 110002
+## Title: Death Analyzer
+## Notes: Analyzes your deaths and tells you what could have saved you
+## Author: YourName
+## Version: 1.3.0
+## SavedVariables: DeathAnalyzerDB
+## OptionalDeps: Details, WeakAuras
+
+# Libraries
+Libs\LibStub.lua
+Libs\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0.lua
+
+# Core
+Core.lua
+DefensiveDatabase.lua
+AvoidableDamageDatabase.lua
+RaidDatabase.lua
+CombatTracker.lua
+DeathAnalysis.lua
+Statistics.lua
+MinimapButton.lua
+Settings.lua
+MechanicsGuide.lua
+UI.lua
