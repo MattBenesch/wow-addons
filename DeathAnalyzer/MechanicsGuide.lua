@@ -226,7 +226,7 @@ local function FindSpellSectionID(encounterID, spellID)
     return SearchSection(rootSectionID, 0)
 end
 
--- Helper function to open Adventure Guide to a specific boss
+-- Helper function to open Adventure Guide to a specific boss and optionally scroll to a spell
 -- Exposed as DA method so it can be called from other files (e.g., UI.lua death timeline)
 function DA:OpenAdventureGuide(bossName, dungeonName, spellID)
     -- Load the encounter journal addon if not loaded
@@ -251,16 +251,45 @@ function DA:OpenAdventureGuide(bossName, dungeonName, spellID)
         return false, false
     end
 
+    local foundSpell = false
+
     -- Use EncounterJournal_OpenJournal if available (the standard method)
     if EncounterJournal_OpenJournal then
         if encounter and encounter.encounterID then
             -- Open to specific boss
             EncounterJournal_OpenJournal(nil, instanceID, encounter.encounterID)
+
+            -- Now try to navigate to the specific spell section
+            if spellID and spellID > 0 then
+                -- Need a small delay for the journal to fully populate
+                C_Timer.After(0.15, function()
+                    local sectionID = FindSpellSectionID(encounter.encounterID, spellID)
+                    if sectionID then
+                        -- Use the API to open to that specific section
+                        if EncounterJournal_OpenSection then
+                            EncounterJournal_OpenSection(sectionID)
+                        elseif EncounterJournal.encounter and EncounterJournal.encounter.info then
+                            -- Fallback: try to scroll to section
+                            local scrollFrame = EncounterJournal.encounter.info.detailsScroll
+                            if scrollFrame and scrollFrame.ScrollTarget then
+                                -- Find the section button and scroll to it
+                                for _, child in pairs({scrollFrame.ScrollTarget:GetChildren()}) do
+                                    if child.spellID == spellID or (child.sectionID and child.sectionID == sectionID) then
+                                        child:Click()
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        foundSpell = true
+                    end
+                end)
+            end
         else
             -- Open to instance overview
             EncounterJournal_OpenJournal(nil, instanceID)
         end
-        return true, false
+        return true, foundSpell
     end
 
     -- Fallback: manually show and select
@@ -270,9 +299,19 @@ function DA:OpenAdventureGuide(bossName, dungeonName, spellID)
     end
     if encounter and encounter.encounterID and EJ_SelectEncounter then
         EJ_SelectEncounter(encounter.encounterID)
+
+        -- Try to find spell section with fallback
+        if spellID and spellID > 0 then
+            C_Timer.After(0.15, function()
+                local sectionID = FindSpellSectionID(encounter.encounterID, spellID)
+                if sectionID and EncounterJournal_OpenSection then
+                    EncounterJournal_OpenSection(sectionID)
+                end
+            end)
+        end
     end
 
-    return true, false
+    return true, foundSpell
 end
 
 -- Open the Mechanics Guide and navigate to a specific spell
@@ -378,26 +417,25 @@ end
 
 function DA:CreateMechanicsGuide()
     if self.guideFrame then return end
-    
+
     local frame = CreateFrame("Frame", "DeathAnalyzerGuideFrame", UIParent, "BackdropTemplate")
     frame:SetSize(GUIDE_WIDTH, GUIDE_HEIGHT)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 20) -- Slightly above center
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
     frame:SetFrameStrata("DIALOG")
     frame:SetFrameLevel(180)
-    
-    -- Backdrop - modern style matching main UI
+
+    -- Backdrop - modern style
     frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 2,
-        insets = { left = 2, right = 2, top = 2, bottom = 2 },
     })
-    frame:SetBackdropColor(unpack(DA.Theme.background))
-    frame:SetBackdropBorderColor(unpack(DA.Theme.accent))
-    
+    frame:SetBackdropColor(0.08, 0.08, 0.08, 0.97)
+    frame:SetBackdropBorderColor(0.2, 0.5, 0.2, 1)
+
     -- Make draggable
     frame:SetScript("OnMouseDown", function(self, button)
         if button == "LeftButton" then
@@ -407,79 +445,146 @@ function DA:CreateMechanicsGuide()
     frame:SetScript("OnMouseUp", function(self)
         self:StopMovingOrSizing()
     end)
-    
+
     --------------------------------------------------------------------------------
-    -- Header
+    -- Header Bar
     --------------------------------------------------------------------------------
-    
-    local header = CreateFrame("Frame", nil, frame)
-    header:SetHeight(40)
-    header:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
-    header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
-    
-    -- Header accent bar
-    local headerAccent = header:CreateTexture(nil, "ARTWORK")
-    headerAccent:SetSize(3, 28)
-    headerAccent:SetPoint("LEFT", header, "LEFT", 4, 0)
-    headerAccent:SetColorTexture(unpack(DA.Theme.accent))
+
+    local header = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    header:SetHeight(36)
+    header:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -2)
+    header:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+    header:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    header:SetBackdropColor(0.12, 0.12, 0.12, 1)
 
     -- Title with book icon
     local titleIcon = header:CreateTexture(nil, "ARTWORK")
-    titleIcon:SetSize(28, 28)
-    titleIcon:SetPoint("LEFT", headerAccent, "RIGHT", 8, 0)
+    titleIcon:SetSize(24, 24)
+    titleIcon:SetPoint("LEFT", header, "LEFT", 10, 0)
     titleIcon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
     titleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", titleIcon, "RIGHT", 10, 0)
-    title:SetTextColor(unpack(DA.Theme.accent))
-    title:SetText("Mechanics Guide")
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("LEFT", titleIcon, "RIGHT", 8, 0)
+    title:SetText("|cFF00FF00Death Analyzer|r - |cFFFFFFFFMechanics Guide|r")
 
     local subtitle = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     subtitle:SetPoint("LEFT", title, "RIGHT", 10, 0)
-    subtitle:SetTextColor(unpack(DA.Theme.textMuted))
+    subtitle:SetTextColor(0.5, 0.5, 0.5)
     subtitle:SetText("Learn how to avoid damage")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 5)
+
+    -- Close button (styled)
+    local closeBtn = CreateFrame("Button", nil, header, "BackdropTemplate")
+    closeBtn:SetSize(20, 20)
+    closeBtn:SetPoint("RIGHT", header, "RIGHT", -6, 0)
+    closeBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    closeBtn:SetBackdropColor(0.5, 0.1, 0.1, 0.8)
+    closeBtn:SetBackdropBorderColor(0.6, 0.2, 0.2, 1)
+    local closeBtnText = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    closeBtnText:SetPoint("CENTER", 0, 1)
+    closeBtnText:SetText("|cFFFFFFFFX|r")
+    closeBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.7, 0.2, 0.2, 1)
+    end)
+    closeBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.5, 0.1, 0.1, 0.8)
+    end)
     closeBtn:SetScript("OnClick", function() frame:Hide() end)
-    
-    -- Search box
-    local searchBox = CreateFrame("EditBox", "DAGuideSearchBox", header, "SearchBoxTemplate")
-    searchBox:SetSize(150, 20)
-    searchBox:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0)
+
+    -- Search box with styled container
+    local searchContainer = CreateFrame("Frame", nil, header, "BackdropTemplate")
+    searchContainer:SetSize(180, 22)
+    searchContainer:SetPoint("RIGHT", closeBtn, "LEFT", -10, 0)
+    searchContainer:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    searchContainer:SetBackdropColor(0.08, 0.08, 0.08, 1)
+    searchContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    -- Search icon
+    local searchIcon = searchContainer:CreateTexture(nil, "ARTWORK")
+    searchIcon:SetSize(14, 14)
+    searchIcon:SetPoint("LEFT", searchContainer, "LEFT", 5, 0)
+    searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+
+    local searchBox = CreateFrame("EditBox", "DAGuideSearchBox", searchContainer)
+    searchBox:SetSize(150, 18)
+    searchBox:SetPoint("LEFT", searchIcon, "RIGHT", 4, 0)
+    searchBox:SetFontObject("GameFontNormalSmall")
+    searchBox:SetAutoFocus(false)
+    searchBox:SetTextInsets(2, 2, 0, 0)
+    searchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     searchBox:SetScript("OnTextChanged", function(self)
-        SearchBoxTemplate_OnTextChanged(self)
         DA:FilterMechanicsGuide(self:GetText())
     end)
+
+    -- Placeholder text
+    local placeholder = searchBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    placeholder:SetPoint("LEFT", searchBox, "LEFT", 2, 0)
+    placeholder:SetText("|cFF666666Search abilities...|r")
+    searchBox.placeholder = placeholder
+
+    searchBox:SetScript("OnEditFocusGained", function(self)
+        self.placeholder:Hide()
+    end)
+    searchBox:SetScript("OnEditFocusLost", function(self)
+        if self:GetText() == "" then
+            self.placeholder:Show()
+        end
+    end)
+
     frame.searchBox = searchBox
     
     --------------------------------------------------------------------------------
     -- Sidebar (Categories)
     --------------------------------------------------------------------------------
-    
+
     local sidebar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     sidebar:SetWidth(SIDEBAR_WIDTH)
-    sidebar:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -5)
-    sidebar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 8, 8)
+    sidebar:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 6, -6)
+    sidebar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 6)
     sidebar:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    sidebar:SetBackdropColor(unpack(DA.Theme.backgroundDark))
-    sidebar:SetBackdropBorderColor(unpack(DA.Theme.border))
-    
+    sidebar:SetBackdropColor(0.06, 0.06, 0.06, 1)
+    sidebar:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+
+    -- Sidebar header
+    local sidebarHeader = CreateFrame("Frame", nil, sidebar, "BackdropTemplate")
+    sidebarHeader:SetHeight(24)
+    sidebarHeader:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 1, -1)
+    sidebarHeader:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", -1, -1)
+    sidebarHeader:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    sidebarHeader:SetBackdropColor(0.1, 0.1, 0.1, 1)
+
+    local sidebarTitle = sidebarHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    sidebarTitle:SetPoint("LEFT", sidebarHeader, "LEFT", 8, 0)
+    sidebarTitle:SetText("|cFFFFD100Categories|r")
+
     -- Sidebar scroll frame
     local sidebarScroll = CreateFrame("ScrollFrame", nil, sidebar, "UIPanelScrollFrameTemplate")
-    sidebarScroll:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 4, -4)
+    sidebarScroll:SetPoint("TOPLEFT", sidebarHeader, "BOTTOMLEFT", 4, -4)
     sidebarScroll:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", -24, 4)
-    
+
+    -- Style scrollbar
+    local scrollBar = sidebarScroll.ScrollBar or _G[sidebarScroll:GetName().."ScrollBar"]
+    if scrollBar then
+        scrollBar:SetPoint("TOPLEFT", sidebarScroll, "TOPRIGHT", 2, -16)
+        scrollBar:SetPoint("BOTTOMLEFT", sidebarScroll, "BOTTOMRIGHT", 2, 16)
+    end
+
     local sidebarContent = CreateFrame("Frame", nil, sidebarScroll)
     sidebarContent:SetSize(SIDEBAR_WIDTH - 30, 1)
     sidebarScroll:SetScrollChild(sidebarContent)
-    
+
     frame.sidebar = sidebar
     frame.sidebarScroll = sidebarScroll
     frame.sidebarContent = sidebarContent
@@ -488,44 +593,77 @@ function DA:CreateMechanicsGuide()
     --------------------------------------------------------------------------------
     -- Content Area
     --------------------------------------------------------------------------------
-    
+
     local content = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 5, 0)
-    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 8)
+    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 6)
     content:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    content:SetBackdropColor(unpack(DA.Theme.panelBg))
-    content:SetBackdropBorderColor(unpack(DA.Theme.border))
-    
-    -- Content header
-    local contentHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    contentHeader:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -10)
-    contentHeader:SetText("Select a category")
+    content:SetBackdropColor(0.1, 0.1, 0.1, 1)
+    content:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+
+    -- Content header bar
+    local contentHeaderBar = CreateFrame("Frame", nil, content, "BackdropTemplate")
+    contentHeaderBar:SetHeight(28)
+    contentHeaderBar:SetPoint("TOPLEFT", content, "TOPLEFT", 1, -1)
+    contentHeaderBar:SetPoint("TOPRIGHT", content, "TOPRIGHT", -1, -1)
+    contentHeaderBar:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    contentHeaderBar:SetBackdropColor(0.12, 0.12, 0.12, 1)
+
+    local contentHeader = contentHeaderBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    contentHeader:SetPoint("LEFT", contentHeaderBar, "LEFT", 10, 0)
+    contentHeader:SetText("|cFF888888Select a category from the sidebar|r")
     frame.contentHeader = contentHeader
-    
+
+    -- Mechanic count label (right side of header)
+    local mechanicCount = contentHeaderBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    mechanicCount:SetPoint("RIGHT", contentHeaderBar, "RIGHT", -10, 0)
+    mechanicCount:SetTextColor(0.5, 0.5, 0.5)
+    frame.mechanicCount = mechanicCount
+
     -- Content scroll frame
     local contentScroll = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    contentScroll:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -35)
+    contentScroll:SetPoint("TOPLEFT", contentHeaderBar, "BOTTOMLEFT", 4, -4)
     contentScroll:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -24, 4)
-    
+
+    -- Style scrollbar
+    local contentScrollBar = contentScroll.ScrollBar or _G[contentScroll:GetName().."ScrollBar"]
+    if contentScrollBar then
+        contentScrollBar:SetPoint("TOPLEFT", contentScroll, "TOPRIGHT", 2, -16)
+        contentScrollBar:SetPoint("BOTTOMLEFT", contentScroll, "BOTTOMRIGHT", 2, 16)
+    end
+
     local contentInner = CreateFrame("Frame", nil, contentScroll)
-    contentInner:SetSize(content:GetWidth() - 30, 1)
+    contentInner:SetSize(content:GetWidth() - 35, 1)
     contentScroll:SetScrollChild(contentInner)
-    
+
     frame.content = content
     frame.contentScroll = contentScroll
     frame.contentInner = contentInner
     frame.mechanicEntries = {}
-    
+
+    --------------------------------------------------------------------------------
+    -- Help Footer
+    --------------------------------------------------------------------------------
+
+    local footer = CreateFrame("Frame", nil, frame)
+    footer:SetHeight(20)
+    footer:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 8, 3)
+    footer:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -8, 3)
+
+    local footerText = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    footerText:SetPoint("LEFT", footer, "LEFT", 0, 0)
+    footerText:SetText("|cFF666666Tip: Click ability to link in chat | Shift-click to open Adventure Guide|r")
+
     self.guideFrame = frame
     frame:Hide()
-    
+
     -- Make ESC close the window
     tinsert(UISpecialFrames, "DeathAnalyzerGuideFrame")
-    
+
     return frame
 end
 
@@ -533,117 +671,179 @@ end
 -- Populate Sidebar
 --------------------------------------------------------------------------------
 
+-- Helper to count mechanics in a data table
+local function CountMechanics(data)
+    if not data then return 0 end
+    local count = 0
+    for _ in pairs(data) do
+        count = count + 1
+    end
+    return count
+end
+
 function DA:PopulateGuideSidebar()
     local frame = self.guideFrame
     if not frame then return end
-    
+
     local content = frame.sidebarContent
     local structure = BuildContentStructure()
-    
+
     -- Clear existing buttons
     for _, btn in ipairs(frame.categoryButtons) do
         btn:Hide()
         btn:SetParent(nil)
     end
     frame.categoryButtons = {}
-    
+
     local yOffset = 0
-    
+
     for _, category in ipairs(structure) do
-        -- Main category button
-        local btn = CreateFrame("Button", nil, content)
-        btn:SetSize(SIDEBAR_WIDTH - 35, 28)
+        -- Main category button with backdrop for better visuals
+        local btn = CreateFrame("Button", nil, content, "BackdropTemplate")
+        btn:SetSize(SIDEBAR_WIDTH - 35, 26)
         btn:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOffset)
-        
+        btn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+        })
+
+        -- Check if selected
+        local isSelected = (selectedCategoryName == category.name)
+        if isSelected then
+            btn:SetBackdropColor(0.25, 0.35, 0.2, 0.8)
+        else
+            btn:SetBackdropColor(0, 0, 0, 0)
+        end
+
         -- Icon
         local icon = btn:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(20, 20)
+        icon:SetSize(18, 18)
         icon:SetPoint("LEFT", btn, "LEFT", 4, 0)
         icon:SetTexture(category.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-        
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
         -- Label
-        local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-        label:SetText(category.name)
+        local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        label:SetPoint("LEFT", icon, "RIGHT", 5, 0)
+        label:SetText("|cFFEEEEEE" .. category.name .. "|r")
         label:SetJustifyH("LEFT")
-        
-        -- Highlight
-        local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
-        highlight:SetAllPoints()
-        highlight:SetColorTexture(0.4, 0.35, 0.2, 0.3)
-        
+
+        -- Mechanic count badge (for non-parent categories)
+        if category.data and not category.children then
+            local count = CountMechanics(category.data)
+            local countBadge = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            countBadge:SetPoint("RIGHT", btn, "RIGHT", -20, 0)
+            countBadge:SetText("|cFF888888" .. count .. "|r")
+        end
+
+        -- Hover effect
+        btn:SetScript("OnEnter", function(self)
+            if selectedCategoryName ~= self.categoryData.name then
+                self:SetBackdropColor(0.2, 0.2, 0.2, 0.5)
+            end
+        end)
+        btn:SetScript("OnLeave", function(self)
+            if selectedCategoryName ~= self.categoryData.name then
+                self:SetBackdropColor(0, 0, 0, 0)
+            end
+        end)
+
         -- Store category data
         btn.categoryData = category
 
-        -- Check if this category is currently selected (for highlighting)
-        local isSelected = (selectedCategoryName == category.name)
-        if isSelected then
-            local selectBg = btn:CreateTexture(nil, "BACKGROUND")
-            selectBg:SetAllPoints()
-            selectBg:SetColorTexture(0.3, 0.25, 0.15, 0.6)
-        end
-
         btn:SetScript("OnClick", function(self)
             if self.categoryData.children then
-                -- Toggle expansion using persistent state
+                -- Toggle expansion
                 expandedCategories[self.categoryData.name] = not expandedCategories[self.categoryData.name]
-                DA:PopulateGuideSidebar() -- Refresh
+                DA:PopulateGuideSidebar()
             else
-                -- Show mechanics for this category
+                -- Show mechanics
                 selectedCategoryName = self.categoryData.name
                 DA:ShowCategoryMechanics(self.categoryData)
-                DA:PopulateGuideSidebar() -- Refresh to update selection highlight
+                DA:PopulateGuideSidebar()
             end
         end)
 
         table.insert(frame.categoryButtons, btn)
-        yOffset = yOffset - 30
+        yOffset = yOffset - 28
 
-        -- If has children, add expansion indicator and optionally show children
+        -- If has children, add expansion indicator
         if category.children then
             local isExpanded = expandedCategories[category.name]
 
-            -- Add expansion indicator (using ASCII to avoid rendering issues)
-            local expandIcon = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            -- Expansion arrow
+            local expandIcon = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             expandIcon:SetPoint("RIGHT", btn, "RIGHT", -4, 0)
-            expandIcon:SetText(isExpanded and "v" or ">")
+            if isExpanded then
+                expandIcon:SetText("|cFFAAAAAA" .. string.char(0x76) .. "|r") -- v
+            else
+                expandIcon:SetText("|cFFAAAAAA>|r")
+            end
 
             if isExpanded then
                 for _, child in ipairs(category.children) do
-                    local childBtn = CreateFrame("Button", nil, content)
-                    childBtn:SetSize(SIDEBAR_WIDTH - 45, 24)
-                    childBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 15, yOffset)
+                    local childBtn = CreateFrame("Button", nil, content, "BackdropTemplate")
+                    childBtn:SetSize(SIDEBAR_WIDTH - 50, 22)
+                    childBtn:SetPoint("TOPLEFT", content, "TOPLEFT", 18, yOffset)
+                    childBtn:SetBackdrop({
+                        bgFile = "Interface\\Buttons\\WHITE8x8",
+                    })
 
-                    -- Check if this child is selected
+                    -- Check if child selected
                     local childSelected = (selectedCategoryName == child.name)
                     if childSelected then
-                        local childSelectBg = childBtn:CreateTexture(nil, "BACKGROUND")
-                        childSelectBg:SetAllPoints()
-                        childSelectBg:SetColorTexture(0.3, 0.25, 0.15, 0.6)
+                        childBtn:SetBackdropColor(0.25, 0.35, 0.2, 0.8)
+                    else
+                        childBtn:SetBackdropColor(0, 0, 0, 0)
                     end
 
-                    local childLabel = childBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    childLabel:SetPoint("LEFT", childBtn, "LEFT", 4, 0)
-                    childLabel:SetText(child.name)
+                    -- Indent marker
+                    local indent = childBtn:CreateTexture(nil, "ARTWORK")
+                    indent:SetSize(2, 16)
+                    indent:SetPoint("LEFT", childBtn, "LEFT", 0, 0)
+                    indent:SetColorTexture(0.3, 0.3, 0.3, 0.5)
 
-                    local childHighlight = childBtn:CreateTexture(nil, "HIGHLIGHT")
-                    childHighlight:SetAllPoints()
-                    childHighlight:SetColorTexture(0.3, 0.3, 0.2, 0.3)
+                    local childLabel = childBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    childLabel:SetPoint("LEFT", indent, "RIGHT", 4, 0)
+                    if childSelected then
+                        childLabel:SetText("|cFFFFFFFF" .. child.name .. "|r")
+                    else
+                        childLabel:SetText("|cFFBBBBBB" .. child.name .. "|r")
+                    end
+
+                    -- Count badge for child
+                    if child.data then
+                        local childCount = CountMechanics(child.data)
+                        local childCountBadge = childBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                        childCountBadge:SetPoint("RIGHT", childBtn, "RIGHT", -4, 0)
+                        childCountBadge:SetText("|cFF666666" .. childCount .. "|r")
+                    end
+
+                    -- Hover effect
+                    childBtn:SetScript("OnEnter", function(self)
+                        if selectedCategoryName ~= self.categoryData.name then
+                            self:SetBackdropColor(0.15, 0.15, 0.15, 0.5)
+                        end
+                    end)
+                    childBtn:SetScript("OnLeave", function(self)
+                        if selectedCategoryName ~= self.categoryData.name then
+                            self:SetBackdropColor(0, 0, 0, 0)
+                        end
+                    end)
 
                     childBtn.categoryData = child
                     childBtn:SetScript("OnClick", function(self)
                         selectedCategoryName = self.categoryData.name
                         DA:ShowCategoryMechanics(self.categoryData)
-                        DA:PopulateGuideSidebar() -- Refresh to update selection highlight
+                        DA:PopulateGuideSidebar()
                     end)
 
                     table.insert(frame.categoryButtons, childBtn)
-                    yOffset = yOffset - 26
+                    yOffset = yOffset - 24
                 end
             end
         end
     end
-    
+
     content:SetHeight(math.abs(yOffset) + 10)
 end
 
@@ -654,21 +854,34 @@ end
 function DA:ShowCategoryMechanics(category)
     local frame = self.guideFrame
     if not frame or not category then return end
-    
+
     frame.contentHeader:SetText("|cFFFFD700" .. category.name .. "|r")
     frame.currentCategory = category
-    
+
     local content = frame.contentInner
-    
+
     -- Clear existing entries
     for _, entry in ipairs(frame.mechanicEntries) do
         entry:Hide()
         entry:SetParent(nil)
     end
     frame.mechanicEntries = {}
-    
+
     local mechanics = category.data
-    if not mechanics then return end
+    if not mechanics then
+        -- Show empty state
+        frame.mechanicCount:SetText("")
+        local emptyText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        emptyText:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -20)
+        emptyText:SetText("|cFF888888No mechanics data available for this category|r")
+        table.insert(frame.mechanicEntries, emptyText)
+        content:SetHeight(60)
+        return
+    end
+
+    -- Count mechanics
+    local mechanicCount = CountMechanics(mechanics)
+    frame.mechanicCount:SetText(mechanicCount .. " abilities")
     
     -- Group by boss if applicable
     local grouped = {}
@@ -750,41 +963,41 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
     -- Store spell info for interactions
     frame.spellID = spellID
     frame.spellName = data.name
-    frame.spellAvoidance = data.avoidance  -- Store avoidance text for click handler
-    frame.bossName = data.boss  -- For Adventure Guide lookup
-    frame.dungeonName = data.dungeon or data.raid  -- For Adventure Guide fallback
-    
-    -- Background - using theme colors
+    frame.spellAvoidance = data.avoidance
+    frame.bossName = data.boss
+    frame.dungeonName = data.dungeon or data.raid
+
+    -- Background
     frame:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    frame:SetBackdropColor(unpack(DA.Theme.panelBg))
-    frame:SetBackdropBorderColor(unpack(DA.Theme.border))
-    
+    frame:SetBackdropColor(0.12, 0.12, 0.12, 1)
+    frame:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+
     -- Category icon (left side)
     local catIcon = frame:CreateTexture(nil, "ARTWORK")
-    catIcon:SetSize(32, 32)
+    catIcon:SetSize(28, 28)
     catIcon:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
     catIcon:SetTexture(CATEGORY_ICONS[data.category] or "Interface\\Icons\\INV_Misc_QuestionMark")
-    
+    catIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
     -- Category label (below icon, small)
     local catInfo = self.AvoidanceCategories and self.AvoidanceCategories[data.category]
     local catLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    catLabel:SetPoint("TOP", catIcon, "BOTTOM", 0, -1)
+    catLabel:SetPoint("TOP", catIcon, "BOTTOM", 0, -2)
     if catInfo then
         catLabel:SetText(catInfo.color .. catInfo.short .. "|r")
     else
         catLabel:SetText("|cFF888888" .. (data.category or "?") .. "|r")
     end
-    
-    -- Spell name (clickable feel - using accent color)
+
+    -- Spell name
     local name = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    name:SetPoint("TOPLEFT", catIcon, "TOPRIGHT", 10, 0)
-    local r, g, b = unpack(DA.Theme.accentBright)
-    name:SetText(string.format("|cFF%02X%02X%02X%s|r", r*255, g*255, b*255, data.name))
-    
+    name:SetPoint("TOPLEFT", catIcon, "TOPRIGHT", 10, 2)
+    name:SetText("|cFF66CCFF" .. data.name .. "|r")
+
     -- Category tag inline
     local catTag = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     catTag:SetPoint("LEFT", name, "RIGHT", 8, 0)
@@ -792,8 +1005,7 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
         catTag:SetText(catInfo.color .. "[" .. catInfo.name .. "]|r")
     end
 
-    -- Difficulty badge (if specified)
-    -- Follows mythictrap.com pattern: [H] = Heroic Only, [H+] = Heroic Changes, [M] = Mythic Only, [M+] = Mythic Changes
+    -- Difficulty badge
     if data.difficulty and data.difficulty ~= "all" then
         local diffBadge = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         diffBadge:SetPoint("LEFT", catTag, "RIGHT", 6, 0)
@@ -801,16 +1013,16 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
         local badgeText, r, g, b
         if data.difficulty == "heroic" then
             badgeText = "[H]"
-            r, g, b = 1, 0.5, 0  -- Orange
+            r, g, b = 1, 0.5, 0
         elseif data.difficulty == "heroic_change" then
             badgeText = "[H+]"
-            r, g, b = 1, 0.7, 0.3  -- Light orange
+            r, g, b = 1, 0.7, 0.3
         elseif data.difficulty == "mythic" then
             badgeText = "[M]"
-            r, g, b = 0.6, 0.2, 0.8  -- Purple
+            r, g, b = 0.6, 0.2, 0.8
         elseif data.difficulty == "mythic_change" then
             badgeText = "[M+]"
-            r, g, b = 0.8, 0.5, 1  -- Light purple
+            r, g, b = 0.8, 0.5, 1
         end
 
         if badgeText then
@@ -818,7 +1030,7 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
             diffBadge:SetTextColor(r, g, b)
         end
 
-        frame.difficultyInfo = data.difficulty  -- Store for tooltip
+        frame.difficultyInfo = data.difficulty
     end
 
     -- Avoidance text (with word wrap)
@@ -829,17 +1041,16 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
     avoidance:SetWordWrap(true)
     avoidance:SetMaxLines(2)
     avoidance:SetText("|cFF88FF88>|r " .. data.avoidance)
-    
-    -- Click hint (small, right side)
-    local clickHint = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    clickHint:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -4)
-    clickHint:SetTextColor(unpack(DA.Theme.textMuted))
-    clickHint:SetText("Shift: Guide")
+
+    -- Spell ID indicator (small, top right)
+    local spellIdText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    spellIdText:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -4)
+    spellIdText:SetText("|cFF555555#" .. spellID .. "|r")
 
     -- Hover effect with spell tooltip
     frame:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(unpack(DA.Theme.panelBgHover))
-        self:SetBackdropBorderColor(unpack(DA.Theme.borderAccent))
+        self:SetBackdropColor(0.18, 0.18, 0.18, 1)
+        self:SetBackdropBorderColor(0.3, 0.5, 0.3, 1)
 
         -- Show spell tooltip
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -866,8 +1077,8 @@ function DA:CreateMechanicEntry(parent, spellID, data, width)
         GameTooltip:Show()
     end)
     frame:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(unpack(DA.Theme.panelBg))
-        self:SetBackdropBorderColor(unpack(DA.Theme.border))
+        self:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        self:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
         GameTooltip:Hide()
     end)
     

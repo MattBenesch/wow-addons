@@ -244,34 +244,54 @@ local function CreatePanelHeader(parent, title, collapsible)
     return header
 end
 
--- Create a score meter bar
+-- Create a prominent score display (larger, more visible)
 local function CreateScoreMeter(parent, width)
     local meter = CreateFrame("Frame", nil, parent)
-    meter:SetSize(width + 35, 14)
+    meter:SetSize(width, 36)
 
-    -- Score text (left of bar)
-    local scoreText = meter:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    scoreText:SetPoint("LEFT", meter, "LEFT", 0, 0)
-    scoreText:SetWidth(30)
-    scoreText:SetJustifyH("RIGHT")
+    -- Container for score + /10 (right-aligned within meter)
+    local scoreContainer = CreateFrame("Frame", nil, meter)
+    scoreContainer:SetSize(80, 30)
+    scoreContainer:SetPoint("RIGHT", meter, "RIGHT", 0, 2)
+
+    -- Large score number (prominent display)
+    local scoreText = scoreContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    scoreText:SetPoint("RIGHT", scoreContainer, "RIGHT", -25, 0)
+    scoreText:SetFont(scoreText:GetFont(), 24, "OUTLINE")
     meter.scoreText = scoreText
 
-    -- Bar background
+    -- "/10" suffix (fixed position relative to container)
+    local maxText = scoreContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    maxText:SetPoint("BOTTOMRIGHT", scoreContainer, "BOTTOMRIGHT", 0, 4)
+    maxText:SetText("/10")
+    maxText:SetTextColor(0.5, 0.5, 0.5, 1)
+    meter.maxText = maxText
+
+    -- Bar background (below the number)
     local barBg = meter:CreateTexture(nil, "BACKGROUND")
-    barBg:SetPoint("LEFT", scoreText, "RIGHT", 4, 0)
-    barBg:SetSize(width, 10)
+    barBg:SetPoint("BOTTOMLEFT", meter, "BOTTOMLEFT", 0, 0)
+    barBg:SetPoint("BOTTOMRIGHT", meter, "BOTTOMRIGHT", 0, 0)
+    barBg:SetHeight(6)
     barBg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
     meter.barBg = barBg
 
     -- Fill bar
     local fill = meter:CreateTexture(nil, "ARTWORK")
     fill:SetPoint("LEFT", barBg, "LEFT", 0, 0)
-    fill:SetHeight(10)
+    fill:SetHeight(6)
     meter.fill = fill
+
+    -- Score label above
+    local label = meter:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("TOPLEFT", meter, "TOPLEFT", 0, 0)
+    label:SetText("SCORE")
+    label:SetTextColor(0.6, 0.6, 0.6, 1)
+    meter.label = label
 
     -- Update function
     function meter:SetScore(score)
-        local fillWidth = math.max(2, (score / 10) * width)
+        local barWidth = self.barBg:GetWidth() or width
+        local fillWidth = math.max(2, (score / 10) * barWidth)
         self.fill:SetWidth(fillWidth)
 
         local r, g, b = DA:GetScoreColor(score)
@@ -471,11 +491,11 @@ function DA:CreateMainWindow()
     content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 8)
     frame.content = content
     
-    -- Verdict panel
+    -- Verdict panel (increased height for larger score display)
     local verdictPanel = self:CreateVerdictPanel(content)
     verdictPanel:SetPoint("TOPLEFT", content, "TOPLEFT")
     verdictPanel:SetPoint("TOPRIGHT", content, "TOPRIGHT")
-    verdictPanel:SetHeight(80)
+    verdictPanel:SetHeight(90)
     frame.verdictPanel = verdictPanel
 
     -- Health Graph panel (visual health timeline)
@@ -531,27 +551,43 @@ function DA:CreateVerdictPanel(parent)
     panel:SetBackdropColor(unpack(DA.Theme.panelBg))
     panel:SetBackdropBorderColor(unpack(DA.Theme.border))
 
-    -- Row 1: Verdict text (left) and Score (right)
+    -- Score meter (RIGHT side, prominent display)
+    local scoreMeter = CreateScoreMeter(panel, 120)
+    scoreMeter:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -6)
+    panel.scoreMeter = scoreMeter
+
+    -- Verdict text (left side, below score level)
     local verdict = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     verdict:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -8)
-    verdict:SetWidth(280)
+    verdict:SetPoint("RIGHT", scoreMeter, "LEFT", -15, 0)
     verdict:SetJustifyH("LEFT")
     panel.verdict = verdict
 
-    -- Score meter (right side, same row as verdict)
-    local scoreMeter = CreateScoreMeter(panel, 100)
-    scoreMeter:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -8)
-    panel.scoreMeter = scoreMeter
+    -- M+ Context display (below verdict, left side)
+    local mplusContext = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    mplusContext:SetPoint("TOPLEFT", verdict, "BOTTOMLEFT", 0, -2)
+    mplusContext:SetJustifyH("LEFT")
+    mplusContext:SetTextColor(0.4, 0.8, 1.0)
+    mplusContext:Hide()
+    panel.mplusContext = mplusContext
 
-    -- Row 2: Killing blow
+    -- Killing blow (middle row)
     local killingBlow = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    killingBlow:SetPoint("TOPLEFT", verdict, "BOTTOMLEFT", 0, -4)
+    killingBlow:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -38)
     killingBlow:SetPoint("RIGHT", panel, "RIGHT", -10, 0)
     killingBlow:SetJustifyH("LEFT")
     killingBlow:SetTextColor(unpack(DA.Theme.textSecondary))
+    killingBlow:SetWordWrap(false)
     panel.killingBlow = killingBlow
 
-    -- Row 3: Suggestion (bottom)
+    -- Overkill indicator (after killing blow, same line)
+    local overkillText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    overkillText:SetPoint("TOPLEFT", killingBlow, "BOTTOMLEFT", 0, -2)
+    overkillText:SetJustifyH("LEFT")
+    overkillText:Hide()
+    panel.overkillText = overkillText
+
+    -- Suggestion (bottom)
     local suggestion = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     suggestion:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 10, 6)
     suggestion:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 6)
@@ -566,6 +602,203 @@ function DA:CreateVerdictPanel(parent)
     panel.score = score
 
     return panel
+end
+
+--------------------------------------------------------------------------------
+-- Health Graph Panel (Visual Health Timeline)
+--------------------------------------------------------------------------------
+
+function DA:CreateHealthGraphPanel(parent)
+    local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    panel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    panel:SetBackdropColor(unpack(DA.Theme.panelBg))
+    panel:SetBackdropBorderColor(unpack(DA.Theme.border))
+
+    -- Graph area (inset from panel edges)
+    local graphFrame = CreateFrame("Frame", nil, panel)
+    graphFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", 40, -8)
+    graphFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 16)
+    panel.graphFrame = graphFrame
+
+    -- Y-axis labels
+    local label100 = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label100:SetPoint("RIGHT", graphFrame, "TOPLEFT", -4, 0)
+    label100:SetText("100%")
+    label100:SetTextColor(unpack(DA.Theme.textMuted))
+
+    local label50 = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label50:SetPoint("RIGHT", graphFrame, "LEFT", -4, 0)
+    label50:SetText("50%")
+    label50:SetTextColor(unpack(DA.Theme.textMuted))
+
+    local label0 = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label0:SetPoint("RIGHT", graphFrame, "BOTTOMLEFT", -4, 0)
+    label0:SetText("0%")
+    label0:SetTextColor(unpack(DA.Theme.textMuted))
+
+    -- Time labels (will be updated dynamically)
+    local timeStart = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    timeStart:SetPoint("TOPLEFT", graphFrame, "BOTTOMLEFT", 0, -2)
+    timeStart:SetTextColor(unpack(DA.Theme.textMuted))
+    panel.timeStart = timeStart
+
+    local timeEnd = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    timeEnd:SetPoint("TOPRIGHT", graphFrame, "BOTTOMRIGHT", 0, -2)
+    timeEnd:SetText("Death")
+    timeEnd:SetTextColor(1, 0.3, 0.3)
+    panel.timeEnd = timeEnd
+
+    -- Grid lines (horizontal)
+    for i = 1, 3 do
+        local line = graphFrame:CreateTexture(nil, "BACKGROUND")
+        line:SetColorTexture(0.3, 0.3, 0.3, 0.3)
+        line:SetHeight(1)
+        line:SetPoint("LEFT", graphFrame, "LEFT", 0, 0)
+        line:SetPoint("RIGHT", graphFrame, "RIGHT", 0, 0)
+        local yOffset = (i / 4) * graphFrame:GetHeight()
+        line:SetPoint("TOP", graphFrame, "BOTTOM", 0, yOffset)
+    end
+
+    -- Store line segments for the graph
+    panel.lineSegments = {}
+    panel.eventMarkers = {}
+
+    return panel
+end
+
+-- Update health graph with death data
+function DA:UpdateHealthGraph(panel, snapshot)
+    if not panel or not snapshot or not snapshot.events then return end
+
+    local graphFrame = panel.graphFrame
+    if not graphFrame then return end
+
+    -- Clear existing lines and markers
+    for _, line in ipairs(panel.lineSegments or {}) do
+        line:Hide()
+    end
+    for _, marker in ipairs(panel.eventMarkers or {}) do
+        marker:Hide()
+    end
+    panel.lineSegments = {}
+    panel.eventMarkers = {}
+
+    local events = snapshot.events
+    if #events == 0 then return end
+
+    -- Calculate time range
+    local deathTime = snapshot.timestamp
+    local startTime = events[1].timestamp
+    local timeRange = deathTime - startTime
+    if timeRange <= 0 then timeRange = 1 end
+
+    -- Update time label
+    panel.timeStart:SetText(string.format("-%.1fs", timeRange))
+
+    -- Get graph dimensions
+    local graphWidth = graphFrame:GetWidth()
+    local graphHeight = graphFrame:GetHeight()
+
+    if graphWidth <= 0 or graphHeight <= 0 then
+        -- Frame not sized yet, try again later
+        C_Timer.After(0.1, function()
+            self:UpdateHealthGraph(panel, snapshot)
+        end)
+        return
+    end
+
+    -- Build health data points
+    local dataPoints = {}
+    local lastHealth = 100
+
+    for _, event in ipairs(events) do
+        if event.healthPercent and event.healthPercent > 0 then
+            local x = ((event.timestamp - startTime) / timeRange) * graphWidth
+            local y = (event.healthPercent / 100) * graphHeight
+            table.insert(dataPoints, {
+                x = x,
+                y = y,
+                health = event.healthPercent,
+                event = event,
+            })
+            lastHealth = event.healthPercent
+        end
+    end
+
+    -- Add death point
+    table.insert(dataPoints, {
+        x = graphWidth,
+        y = 0,
+        health = 0,
+        isDeath = true,
+    })
+
+    -- Draw line segments
+    for i = 2, #dataPoints do
+        local prev = dataPoints[i - 1]
+        local curr = dataPoints[i]
+
+        local line = graphFrame:CreateTexture(nil, "ARTWORK")
+
+        -- Color based on health level
+        local healthAvg = (prev.health + curr.health) / 2
+        if healthAvg > 60 then
+            line:SetColorTexture(0.3, 1.0, 0.3, 0.9)  -- Green
+        elseif healthAvg > 30 then
+            line:SetColorTexture(1.0, 0.8, 0.2, 0.9)  -- Yellow
+        else
+            line:SetColorTexture(1.0, 0.3, 0.3, 0.9)  -- Red
+        end
+
+        -- Calculate line dimensions
+        local dx = curr.x - prev.x
+        local dy = curr.y - prev.y
+        local length = math.sqrt(dx * dx + dy * dy)
+        local angle = math.atan2(dy, dx)
+
+        line:SetSize(length, 2)
+        line:SetPoint("CENTER", graphFrame, "BOTTOMLEFT", (prev.x + curr.x) / 2, (prev.y + curr.y) / 2)
+
+        -- WoW doesn't support rotation, so we'll use a simpler approach - horizontal lines with vertical steps
+        line:ClearAllPoints()
+        line:SetHeight(2)
+        line:SetPoint("LEFT", graphFrame, "BOTTOMLEFT", prev.x, prev.y)
+        line:SetPoint("RIGHT", graphFrame, "BOTTOMLEFT", curr.x, curr.y)
+
+        table.insert(panel.lineSegments, line)
+    end
+
+    -- Draw event markers for damage/healing
+    for i, point in ipairs(dataPoints) do
+        if point.event and (point.event.type == "DAMAGE" or point.event.type == "HEALING") then
+            local marker = graphFrame:CreateTexture(nil, "OVERLAY")
+            marker:SetSize(6, 6)
+            marker:SetPoint("CENTER", graphFrame, "BOTTOMLEFT", point.x, point.y)
+
+            if point.event.type == "DAMAGE" then
+                marker:SetColorTexture(1.0, 0.2, 0.2, 1.0)
+                -- Check if avoidable
+                if self:IsDamageAvoidable(point.event.spellID) then
+                    marker:SetColorTexture(1.0, 0.5, 0.0, 1.0)  -- Orange for avoidable
+                end
+            else
+                marker:SetColorTexture(0.2, 1.0, 0.2, 1.0)
+            end
+
+            table.insert(panel.eventMarkers, marker)
+        end
+    end
+
+    -- Death marker (skull-like indicator)
+    local deathMarker = graphFrame:CreateTexture(nil, "OVERLAY")
+    deathMarker:SetSize(12, 12)
+    deathMarker:SetPoint("CENTER", graphFrame, "BOTTOMRIGHT", 0, 0)
+    deathMarker:SetColorTexture(1.0, 0.0, 0.0, 1.0)
+    table.insert(panel.eventMarkers, deathMarker)
 end
 
 --------------------------------------------------------------------------------
@@ -711,24 +944,29 @@ end
 
 function DA:DisplayDeath(snapshot)
     if not self.mainFrame or not snapshot then return end
-    
+
     -- Update counter
     self.mainFrame.deathCounter:SetText(self.currentDeathIndex .. "/" .. #self.deathSnapshots)
-    
+
     -- Ensure analysis exists
     if not snapshot.analysis then
         self:AnalyzeDeath(snapshot)
     end
-    
+
     local analysis = snapshot.analysis
     if not analysis then return end
-    
+
     -- Update verdict panel
     self:UpdateVerdictPanel(snapshot, analysis)
-    
+
+    -- Update health graph
+    if self.mainFrame.healthGraphPanel then
+        self:UpdateHealthGraph(self.mainFrame.healthGraphPanel, snapshot)
+    end
+
     -- Update timeline
     self:UpdateTimelinePanel(snapshot, analysis)
-    
+
     -- Update defensives
     self:UpdateDefensivesPanel(snapshot, analysis)
 end
@@ -749,8 +987,40 @@ function DA:UpdateVerdictPanel(snapshot, analysis)
     local scoreColor = analysis.score >= 7 and "|cFF00FF00" or
                        analysis.score >= 4 and "|cFFFFFF00" or "|cFFFF0000"
     panel.score:SetText(scoreColor .. "Score: " .. analysis.score .. "/10|r")
-    
-    -- Killing blow
+
+    -- M+ Context display
+    if panel.mplusContext then
+        if snapshot.mythicPlus and snapshot.mythicPlus.keyLevel then
+            local mp = snapshot.mythicPlus
+            local affixText = ""
+            if mp.affixes and #mp.affixes > 0 then
+                local affixNames = {}
+                for i, affix in ipairs(mp.affixes) do
+                    if i <= 3 then  -- Show up to 3 affixes
+                        table.insert(affixNames, affix.name)
+                    end
+                end
+                affixText = " (" .. table.concat(affixNames, "/") .. ")"
+            end
+            panel.mplusContext:SetText(string.format("|cFF00CCFF+%d|r %s%s",
+                mp.keyLevel,
+                mp.dungeonName or "",
+                affixText
+            ))
+            panel.mplusContext:Show()
+        elseif snapshot.encounter then
+            -- Show boss encounter info instead
+            panel.mplusContext:SetText(string.format("|cFFFFCC00%s|r %s",
+                snapshot.encounter.encounterName or "Boss",
+                snapshot.difficultyName or ""
+            ))
+            panel.mplusContext:Show()
+        else
+            panel.mplusContext:Hide()
+        end
+    end
+
+    -- Killing blow with overkill indicator
     if analysis.killingBlow then
         local kb = analysis.killingBlow
         -- Check if killing blow was avoidable
@@ -759,19 +1029,59 @@ function DA:UpdateVerdictPanel(snapshot, analysis)
         if kbInfo then
             local catInfo = kbInfo.categoryInfo
             if catInfo then
-                kbAvoidable = " " .. catInfo.color .. "[" .. catInfo.name:upper() .. "]|r"
+                kbAvoidable = " " .. catInfo.color .. "[" .. catInfo.name:sub(1,6):upper() .. "]|r"
             end
         end
-        panel.killingBlow:SetText(string.format("Killed by: |cFFFF6666%s|r from %s (%s damage)%s",
-            kb.spellName or "Unknown",
-            kb.source or "Unknown",
+        -- Truncate spell and source names to prevent overflow
+        local spellName = kb.spellName or "Unknown"
+        local sourceName = kb.source or "Unknown"
+        if #spellName > 25 then spellName = spellName:sub(1,23) .. ".." end
+        if #sourceName > 18 then sourceName = sourceName:sub(1,16) .. ".." end
+
+        panel.killingBlow:SetText(string.format("Killed by: |cFFFF6666%s|r from %s (%s)%s",
+            spellName,
+            sourceName,
             self:FormatNumber(kb.amount or 0),
             kbAvoidable
         ))
+
+        -- Overkill indicator
+        if panel.overkillText then
+            local overkill = kb.overkill or 0
+            if overkill > 0 then
+                local playerInfo = snapshot.playerInfo or self:GetPlayerInfo()
+                local maxHealth = playerInfo.maxHealth or 1
+                local overkillPercent = (overkill / maxHealth) * 100
+
+                if overkillPercent > 50 then
+                    panel.overkillText:SetText(string.format("|cFFFF0000OVERKILL +%s (%.0f%%)|r",
+                        self:FormatNumber(overkill), overkillPercent))
+                elseif overkillPercent > 20 then
+                    panel.overkillText:SetText(string.format("|cFFFF6600Overkill +%s|r",
+                        self:FormatNumber(overkill)))
+                else
+                    panel.overkillText:SetText(string.format("|cFFFFCC00Barely died (-%s HP)|r",
+                        self:FormatNumber(overkill)))
+                end
+                panel.overkillText:Show()
+            else
+                -- Check if we can calculate how close they were
+                local lastDamage = kb.amount or 0
+                if lastDamage > 0 then
+                    panel.overkillText:SetText("|cFF00FF00Exact lethal hit|r")
+                    panel.overkillText:Show()
+                else
+                    panel.overkillText:Hide()
+                end
+            end
+        end
     else
         panel.killingBlow:SetText("Killing blow unknown")
+        if panel.overkillText then
+            panel.overkillText:Hide()
+        end
     end
-    
+
     -- Suggestion - show primary suggestion
     local suggestionText = ""
     if analysis.avoidablePercent and analysis.avoidablePercent > 0 then
@@ -787,39 +1097,51 @@ end
 function DA:UpdateTimelinePanel(snapshot, analysis)
     local panel = self.mainFrame.timelinePanel
     local scrollChild = panel.scrollChild
+    local scrollFrame = panel.scrollFrame
 
-    -- Clear old entries
+    -- Clear old entries properly (release textures/fontstrings)
     for _, entry in ipairs(panel.entries) do
         entry:Hide()
+        entry:ClearAllPoints()
         entry:SetParent(nil)
     end
-    panel.entries = {}
+    wipe(panel.entries)
+
+    -- Reset scroll position to top for new death
+    scrollFrame:SetVerticalScroll(0)
 
     -- Create new entries with dynamic height
     local timeline = analysis.timeline or {}
     local yOffset = 0
 
+    -- Calculate available width for entries
+    local entryWidth = scrollFrame:GetWidth() - 4
+
     for i, event in ipairs(timeline) do
         -- Avoidable damage gets two-line layout (taller)
         local entryHeight = (event.isAvoidable and event.avoidanceInfo) and TIMELINE_ENTRY_HEIGHT + 14 or TIMELINE_ENTRY_HEIGHT
-        local entry = self:CreateTimelineEntry(scrollChild, event, entryHeight)
+        local entry = self:CreateTimelineEntry(scrollChild, event, entryHeight, entryWidth)
         entry:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -yOffset)
-        entry:SetPoint("RIGHT", scrollChild, "RIGHT", 0, 0)
+        entry:SetWidth(entryWidth)
         table.insert(panel.entries, entry)
         yOffset = yOffset + entryHeight + 2  -- 2px spacing between entries
     end
 
-    scrollChild:SetHeight(math.max(1, yOffset))
-    scrollChild:SetWidth(panel.scrollFrame:GetWidth())
+    -- Set scroll child size for THIS death's timeline
+    local totalHeight = math.max(1, yOffset)
+    scrollChild:SetHeight(totalHeight)
+    scrollChild:SetWidth(entryWidth)
 end
 
-function DA:CreateTimelineEntry(parent, event, height)
+function DA:CreateTimelineEntry(parent, event, height, entryWidth)
     height = height or TIMELINE_ENTRY_HEIGHT
+    entryWidth = entryWidth or 400
     local isAvoidable = event.isAvoidable and event.avoidanceInfo
     local isTwoLine = isAvoidable and height > TIMELINE_ENTRY_HEIGHT
 
     local entry = CreateFrame("Frame", nil, parent)
     entry:SetHeight(height)
+    entry:SetWidth(entryWidth)
     entry:EnableMouse(true)
 
     -- Left border color based on event type
@@ -845,21 +1167,21 @@ function DA:CreateTimelineEntry(parent, event, height)
     local timeText = entry:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     local timeYOffset = isTwoLine and 6 or 0
     timeText:SetPoint("LEFT", entry, "LEFT", 8, timeYOffset)
-    timeText:SetWidth(45)
+    timeText:SetWidth(40)
     timeText:SetJustifyH("LEFT")
     timeText:SetTextColor(unpack(DA.Theme.textSecondary))
     timeText:SetText(self:FormatTime(event.relativeTime))
 
-    -- Health bar background (slightly larger)
+    -- Health bar background
     local healthBg = entry:CreateTexture(nil, "BACKGROUND")
     healthBg:SetPoint("LEFT", timeText, "RIGHT", 4, 0)
-    healthBg:SetSize(55, 10)
+    healthBg:SetSize(50, 10)
     healthBg:SetColorTexture(0.15, 0.15, 0.15, 0.8)
 
     -- Health bar fill
     local healthBar = entry:CreateTexture(nil, "ARTWORK")
     healthBar:SetPoint("LEFT", healthBg, "LEFT", 1, 0)
-    local healthWidth = math.max(1, 48 * (event.healthPercent / 100))
+    local healthWidth = math.max(1, 44 * (event.healthPercent / 100))
     healthBar:SetSize(healthWidth, 8)
 
     -- Health color gradient
@@ -875,8 +1197,8 @@ function DA:CreateTimelineEntry(parent, event, height)
 
     -- Icon (type indicator) - using text icons
     local icon = entry:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    icon:SetPoint("LEFT", healthBg, "RIGHT", 6, 0)
-    icon:SetWidth(18)
+    icon:SetPoint("LEFT", healthBg, "RIGHT", 4, 0)
+    icon:SetWidth(16)
 
     if event.type == "DAMAGE" then
         if isAvoidable and event.avoidanceInfo.categoryInfo then
@@ -893,12 +1215,25 @@ function DA:CreateTimelineEntry(parent, event, height)
         icon:SetText("")
     end
 
+    -- Calculate remaining width for description
+    local descWidth = entryWidth - 8 - 40 - 4 - 50 - 4 - 16 - 4 - 6  -- ~entryWidth - 132
+
     -- Main description line
     local desc = entry:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     desc:SetPoint("LEFT", icon, "RIGHT", 4, 0)
-    desc:SetPoint("RIGHT", entry, "RIGHT", -6, 0)
+    desc:SetWidth(descWidth)
     desc:SetJustifyH("LEFT")
     desc:SetTextColor(unpack(DA.Theme.textPrimary))
+    desc:SetWordWrap(false)
+
+    -- Helper to truncate text
+    local function truncate(text, maxLen)
+        if not text then return "?" end
+        if #text > maxLen then
+            return text:sub(1, maxLen - 2) .. ".."
+        end
+        return text
+    end
 
     local descText = ""
     if event.type == "DAMAGE" then
@@ -906,26 +1241,31 @@ function DA:CreateTimelineEntry(parent, event, height)
         if isAvoidable then
             local catInfo = event.avoidanceInfo.categoryInfo
             if catInfo then
-                avoidableTag = " " .. catInfo.color .. "[" .. catInfo.name:upper() .. "]|r"
+                avoidableTag = " " .. catInfo.color .. "[" .. catInfo.name:sub(1,5):upper() .. "]|r"
             else
-                avoidableTag = " |cFFFF8800[AVOIDABLE]|r"
+                avoidableTag = " |cFFFF8800[!]|r"
             end
         end
+        -- Truncate spell name and source to prevent overflow
+        local spellName = truncate(event.spellName or "Unknown", 20)
+        local sourceName = truncate(event.source or "?", 12)
         descText = string.format("|cFFFF6666-%s|r %s (%s)%s",
             self:FormatNumber(event.amount),
-            event.spellName or "Unknown",
-            event.source or "?",
+            spellName,
+            sourceName,
             avoidableTag
         )
     elseif event.type == "HEALING" then
+        local spellName = truncate(event.spellName or "Unknown", 20)
+        local sourceName = truncate(event.source or "?", 12)
         descText = string.format("|cFF66FF66+%s|r %s (%s)",
             self:FormatNumber(event.amount),
-            event.spellName or "Unknown",
-            event.source or "?"
+            spellName,
+            sourceName
         )
     elseif event.type == "DEFENSIVE_USED" then
         descText = string.format("|cFFFFCC00%s|r activated",
-            event.spellName or "Unknown"
+            truncate(event.spellName or "Unknown", 25)
         )
     end
 
@@ -1241,4 +1581,221 @@ function DA:ShowDeathPopup(snapshot)
     end
     
     print("  |cFF888888Type /da to view full analysis|r")
+end
+
+--------------------------------------------------------------------------------
+-- Death Export/Share Functionality
+--------------------------------------------------------------------------------
+
+-- Generate a shareable text summary of a death
+function DA:GenerateExportText(snapshot)
+    if not snapshot then return "No death data" end
+
+    if not snapshot.analysis then
+        self:AnalyzeDeath(snapshot)
+    end
+
+    local analysis = snapshot.analysis
+    if not analysis then return "Analysis unavailable" end
+
+    local lines = {}
+
+    -- Header
+    table.insert(lines, "=== Death Analyzer Report ===")
+    table.insert(lines, "")
+
+    -- Context
+    table.insert(lines, "Date: " .. (snapshot.dateString or "Unknown"))
+    table.insert(lines, "Location: " .. (snapshot.location or "Unknown") .. " - " .. (snapshot.subzone or ""))
+
+    -- M+ Context
+    if snapshot.mythicPlus and snapshot.mythicPlus.keyLevel then
+        local mp = snapshot.mythicPlus
+        local affixNames = {}
+        if mp.affixes then
+            for _, affix in ipairs(mp.affixes) do
+                table.insert(affixNames, affix.name)
+            end
+        end
+        table.insert(lines, "M+ Key: +" .. mp.keyLevel .. " " .. (mp.dungeonName or ""))
+        if #affixNames > 0 then
+            table.insert(lines, "Affixes: " .. table.concat(affixNames, ", "))
+        end
+    end
+
+    -- Boss context
+    if snapshot.encounter then
+        table.insert(lines, "Encounter: " .. (snapshot.encounter.encounterName or "Boss") ..
+            " (" .. (snapshot.difficultyName or "Unknown") .. ")")
+    end
+
+    table.insert(lines, "")
+
+    -- Verdict
+    table.insert(lines, "VERDICT: " .. (analysis.verdict and analysis.verdict.text or "Unknown"))
+    table.insert(lines, "Score: " .. (analysis.score or "?") .. "/10")
+    table.insert(lines, "")
+
+    -- Killing Blow
+    if analysis.killingBlow then
+        local kb = analysis.killingBlow
+        local overkillText = ""
+        if kb.overkill and kb.overkill > 0 then
+            overkillText = " (Overkill: " .. self:FormatNumber(kb.overkill) .. ")"
+        end
+        table.insert(lines, "Killing Blow: " .. (kb.spellName or "Unknown") ..
+            " from " .. (kb.source or "Unknown") ..
+            " for " .. self:FormatNumber(kb.amount or 0) .. overkillText)
+    end
+
+    table.insert(lines, "")
+
+    -- Damage summary
+    table.insert(lines, "Total Damage: " .. self:FormatNumber(analysis.totalDamageTaken or 0))
+    table.insert(lines, "Total Healing: " .. self:FormatNumber(analysis.totalHealingReceived or 0))
+
+    if analysis.avoidableDamage and analysis.avoidableDamage > 0 then
+        table.insert(lines, "Avoidable Damage: " .. self:FormatNumber(analysis.avoidableDamage) ..
+            " (" .. string.format("%.0f%%", analysis.avoidablePercent or 0) .. ")")
+    end
+
+    table.insert(lines, "")
+
+    -- Avoidable damage breakdown
+    if analysis.avoidableEvents and #analysis.avoidableEvents > 0 then
+        table.insert(lines, "-- Avoidable Damage Sources --")
+        for i, evt in ipairs(analysis.avoidableEvents) do
+            if i <= 5 then
+                table.insert(lines, "  - " .. (evt.spellName or "Unknown") ..
+                    ": " .. self:FormatNumber(evt.amount or 0) ..
+                    " [" .. (evt.category and evt.category:upper() or "AVOIDABLE") .. "]")
+            end
+        end
+        if #analysis.avoidableEvents > 5 then
+            table.insert(lines, "  ... and " .. (#analysis.avoidableEvents - 5) .. " more")
+        end
+        table.insert(lines, "")
+    end
+
+    -- Unused defensives
+    if analysis.unusedDefensives and #analysis.unusedDefensives > 0 then
+        table.insert(lines, "-- Unused Defensive Cooldowns --")
+        for i, def in ipairs(analysis.unusedDefensives) do
+            if i <= 5 then
+                local survivalNote = ""
+                if def.potentialReduction then
+                    local playerInfo = snapshot.playerInfo or {}
+                    local maxHealth = playerInfo.maxHealth or 1
+                    local overkill = (analysis.killingBlow and analysis.killingBlow.overkill) or 0
+                    if def.potentialReduction > overkill then
+                        survivalNote = " - Would have survived!"
+                    end
+                end
+                table.insert(lines, "  - " .. def.name ..
+                    (def.reduction and (" (" .. def.reduction .. "% DR)") or "") ..
+                    survivalNote)
+            end
+        end
+        table.insert(lines, "")
+    end
+
+    -- Suggestions
+    if analysis.suggestions and #analysis.suggestions > 0 then
+        table.insert(lines, "-- Suggestions --")
+        for i, suggestion in ipairs(analysis.suggestions) do
+            if i <= 3 then
+                -- Strip color codes for export
+                local cleanSuggestion = suggestion:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                table.insert(lines, "  > " .. cleanSuggestion)
+            end
+        end
+        table.insert(lines, "")
+    end
+
+    -- Footer
+    table.insert(lines, "Generated by Death Analyzer v" .. (self.VERSION or "?"))
+
+    return table.concat(lines, "\n")
+end
+
+-- Create export popup window
+function DA:ShowExportWindow(snapshot)
+    if not snapshot then
+        self:Print("No death selected to export")
+        return
+    end
+
+    -- Create or show export frame
+    if not self.exportFrame then
+        local frame = CreateFrame("Frame", "DeathAnalyzerExportFrame", UIParent, "BackdropTemplate")
+        frame:SetSize(450, 350)
+        frame:SetPoint("CENTER")
+        frame:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 2,
+        })
+        frame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+        frame:SetBackdropBorderColor(0.4, 0.8, 0.4, 1)
+        frame:SetMovable(true)
+        frame:EnableMouse(true)
+        frame:RegisterForDrag("LeftButton")
+        frame:SetScript("OnDragStart", frame.StartMoving)
+        frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+        frame:SetFrameStrata("DIALOG")
+        frame:SetClampedToScreen(true)
+
+        -- Title
+        local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", frame, "TOP", 0, -10)
+        title:SetText("|cFF00FF00Export Death Analysis|r")
+
+        -- Close button
+        local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+        closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+
+        -- Scroll frame for text
+        local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+        scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -40)
+        scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 40)
+
+        -- Edit box
+        local editBox = CreateFrame("EditBox", nil, scrollFrame)
+        editBox:SetMultiLine(true)
+        editBox:SetAutoFocus(false)
+        editBox:SetFontObject(GameFontHighlightSmall)
+        editBox:SetWidth(400)
+        editBox:SetScript("OnEscapePressed", function() frame:Hide() end)
+        scrollFrame:SetScrollChild(editBox)
+
+        frame.editBox = editBox
+
+        -- Instructions
+        local instructions = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        instructions:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
+        instructions:SetText("|cFFAAAAAA Ctrl+A to select all, Ctrl+C to copy |r")
+
+        self.exportFrame = frame
+    end
+
+    -- Populate with export text
+    local exportText = self:GenerateExportText(snapshot)
+    self.exportFrame.editBox:SetText(exportText)
+    self.exportFrame.editBox:HighlightText()
+    self.exportFrame.editBox:SetFocus()
+
+    self.exportFrame:Show()
+end
+
+-- Add export button click handler (called from header setup)
+function DA:ExportCurrentDeath()
+    if #self.deathSnapshots == 0 then
+        self:Print("No deaths to export")
+        return
+    end
+
+    local snapshot = self.deathSnapshots[self.currentDeathIndex]
+    if snapshot then
+        self:ShowExportWindow(snapshot)
+    end
 end

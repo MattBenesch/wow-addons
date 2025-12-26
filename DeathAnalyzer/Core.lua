@@ -13,7 +13,7 @@ local ADDON_NAME, DA = ...
 DeathAnalyzer = DA
 
 -- Version info
-DA.VERSION = "1.3.0"
+DA.VERSION = "1.5.0"
 DA.DEBUG = false
 
 -- Core data structures
@@ -217,6 +217,12 @@ SlashCmdList["DEATHANALYZER"] = function(msg)
         else
             DA:Print("Mechanics guide coming soon!")
         end
+    elseif cmd == "export" or cmd == "share" then
+        if DA.ExportCurrentDeath then
+            DA:ExportCurrentDeath()
+        else
+            DA:Print("Export feature not available")
+        end
     elseif cmd == "debug" then
         DA.DEBUG = not DA.DEBUG
         DA:Print("Debug mode: " .. (DA.DEBUG and "ON" or "OFF"))
@@ -229,6 +235,7 @@ SlashCmdList["DEATHANALYZER"] = function(msg)
         print("  /da history - Show death history")
         print("  /da stats - Show death statistics")
         print("  /da guide - Open mechanics guide (adventure book)")
+        print("  /da export - Export current death to clipboard")
         print("  /da config - Open settings")
         print("  /da minimap - Toggle minimap button")
         print("  /da reset - Clear all death data")

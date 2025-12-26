@@ -213,20 +213,45 @@ function DA:ProcessAuraEvent(timestamp, subevent, sourceGUID, destGUID, params)
     local spellID = params[12]
     local spellName = params[13]
     local auraType = params[15] -- BUFF or DEBUFF
-    
+    local sourceName = params[5] -- Source name from original params
+
     -- Only track buffs applied to player
     if destGUID ~= playerGUID or auraType ~= "BUFF" then return end
-    
-    -- Check if this is a tracked defensive
+
+    local currentTime = GetTime()
+    local isApplied = (subevent == "SPELL_AURA_APPLIED" or subevent == "SPELL_AURA_REFRESH")
+
+    -- Check if this is a tracked personal defensive
     if self.defensiveState[spellID] then
         local event = {
-            type = subevent == "SPELL_AURA_APPLIED" and "BUFF_GAIN" or 
+            type = subevent == "SPELL_AURA_APPLIED" and "BUFF_GAIN" or
                    subevent == "SPELL_AURA_REMOVED" and "BUFF_FADE" or "BUFF_REFRESH",
-            timestamp = GetTime(),
+            timestamp = currentTime,
             spellID = spellID,
             spellName = spellName,
         }
-        
+
+        self:AddToBuffer(event)
+    end
+
+    -- Check if this is an external defensive (healer cooldown)
+    if self.ExternalDefensiveLookup and self.ExternalDefensiveLookup[spellID] then
+        -- Track external defensive application/removal
+        if self.TrackExternalDefensive then
+            self:TrackExternalDefensive(spellID, sourceName, sourceGUID, currentTime, isApplied)
+        end
+
+        -- Add to event buffer for timeline
+        local event = {
+            type = isApplied and "EXTERNAL_GAIN" or "EXTERNAL_FADE",
+            timestamp = currentTime,
+            spellID = spellID,
+            spellName = spellName,
+            source = sourceName,
+            sourceGUID = sourceGUID,
+            externalInfo = self.ExternalDefensiveLookup[spellID],
+        }
+
         self:AddToBuffer(event)
     end
 end
@@ -325,12 +350,19 @@ function DA:OnPlayerDeath()
     -- Capture encounter context
     local encounterInfo = self:GetEncounterContext()
 
+    -- Capture active external defensives at death
+    local activeExternals = nil
+    if self.GetActiveExternalsAtDeath then
+        activeExternals = self:GetActiveExternalsAtDeath(deathTime)
+    end
+
     -- Create death snapshot
     local snapshot = {
         timestamp = deathTime,
         dateString = date("%Y-%m-%d %H:%M:%S"),
         events = events,
         readyDefensives = readyDefensives,
+        activeExternals = activeExternals,  -- External CDs that were active at death
         playerInfo = self:GetPlayerInfo(),
         location = GetZoneText(),
         subzone = GetSubZoneText(),

@@ -338,6 +338,101 @@ DA.RacialsDB = {
 }
 
 --------------------------------------------------------------------------------
+-- External Defensives (Healer Cooldowns that can be applied TO the player)
+--------------------------------------------------------------------------------
+
+DA.ExternalDefensivesDB = {
+    -- Priest
+    { spellID = 33206, name = "Pain Suppression", class = "PRIEST", spec = "Discipline", duration = 8, reduction = 40, type = "external_dr" },
+    { spellID = 47788, name = "Guardian Spirit", class = "PRIEST", spec = "Holy", duration = 10, reduction = 0, type = "external_cheat", notes = "Prevents death + 60% healing" },
+    { spellID = 271466, name = "Luminous Barrier", class = "PRIEST", spec = "Discipline", duration = 10, reduction = 0, type = "external_absorb" },
+    { spellID = 17, name = "Power Word: Shield", class = "PRIEST", spec = nil, duration = 15, reduction = 0, type = "external_absorb" },
+
+    -- Paladin
+    { spellID = 1022, name = "Blessing of Protection", class = "PALADIN", spec = nil, duration = 10, reduction = 100, type = "external_immunity", notes = "Physical immunity" },
+    { spellID = 204018, name = "Blessing of Spellwarding", class = "PALADIN", spec = nil, duration = 10, reduction = 100, type = "external_immunity", notes = "Magic immunity" },
+    { spellID = 6940, name = "Blessing of Sacrifice", class = "PALADIN", spec = nil, duration = 12, reduction = 30, type = "external_dr", notes = "30% damage transferred" },
+    { spellID = 31821, name = "Aura Mastery", class = "PALADIN", spec = "Holy", duration = 8, reduction = 0, type = "external_utility", notes = "Raid utility" },
+
+    -- Druid
+    { spellID = 102342, name = "Ironbark", class = "DRUID", spec = "Restoration", duration = 12, reduction = 20, type = "external_dr" },
+
+    -- Monk
+    { spellID = 116849, name = "Life Cocoon", class = "MONK", spec = "Mistweaver", duration = 12, reduction = 0, type = "external_absorb", notes = "Large absorb + healing boost" },
+
+    -- Shaman
+    { spellID = 98008, name = "Spirit Link Totem", class = "SHAMAN", spec = "Restoration", duration = 6, reduction = 10, type = "external_utility", notes = "Redistributes health" },
+    { spellID = 207399, name = "Ancestral Protection Totem", class = "SHAMAN", spec = "Restoration", duration = 30, reduction = 0, type = "external_cheat", notes = "Cheat death totem" },
+
+    -- Evoker
+    { spellID = 357170, name = "Time Dilation", class = "EVOKER", spec = "Preservation", duration = 8, reduction = 50, type = "external_dr", notes = "50% DR on low HP targets" },
+    { spellID = 370960, name = "Emerald Communion", class = "EVOKER", spec = "Preservation", duration = 5, reduction = 0, type = "external_heal", notes = "Channeled heal" },
+    { spellID = 363534, name = "Rewind", class = "EVOKER", spec = "Preservation", duration = 0, reduction = 0, type = "external_heal", notes = "Restores health to 3s ago" },
+
+    -- Warrior (can be used on others in some cases)
+    { spellID = 97462, name = "Rallying Cry", class = "WARRIOR", spec = nil, duration = 10, reduction = 0, type = "external_utility", notes = "+15% max health" },
+
+    -- Demon Hunter
+    { spellID = 212800, name = "Darkness", class = "DEMONHUNTER", spec = "Havoc", duration = 8, reduction = 0, type = "external_utility", notes = "20% avoid chance" },
+}
+
+-- Build a lookup table for quick external buff checking
+DA.ExternalDefensiveLookup = {}
+for _, def in ipairs(DA.ExternalDefensivesDB) do
+    DA.ExternalDefensiveLookup[def.spellID] = def
+end
+
+--------------------------------------------------------------------------------
+-- External Defensive Tracking State
+--------------------------------------------------------------------------------
+
+DA.activeExternals = {}  -- Currently active external defensives on the player
+
+function DA:TrackExternalDefensive(spellID, sourceName, sourceGUID, timestamp, applied)
+    local defInfo = self.ExternalDefensiveLookup[spellID]
+    if not defInfo then return end
+
+    if applied then
+        self.activeExternals[spellID] = {
+            info = defInfo,
+            source = sourceName,
+            sourceGUID = sourceGUID,
+            appliedAt = timestamp,
+            expiresAt = timestamp + (defInfo.duration or 0),
+        }
+        self:Debug("External defensive applied: " .. defInfo.name .. " from " .. (sourceName or "Unknown"))
+    else
+        self.activeExternals[spellID] = nil
+        self:Debug("External defensive faded: " .. defInfo.name)
+    end
+end
+
+function DA:GetActiveExternalsAtDeath(deathTime)
+    local active = {}
+
+    for spellID, state in pairs(self.activeExternals) do
+        if state.expiresAt >= deathTime then
+            table.insert(active, {
+                spellID = spellID,
+                info = state.info,
+                source = state.source,
+                remainingDuration = state.expiresAt - deathTime,
+            })
+        end
+    end
+
+    return active
+end
+
+function DA:ClearExpiredExternals(currentTime)
+    for spellID, state in pairs(self.activeExternals) do
+        if state.expiresAt < currentTime then
+            self.activeExternals[spellID] = nil
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
 -- Helper Functions
 --------------------------------------------------------------------------------
 

@@ -55,10 +55,13 @@ function DA:AnalyzeDeath(snapshot)
     
     -- Analyze unused defensives
     self:AnalyzeUnusedDefensives(snapshot, analysis)
-    
+
+    -- Analyze active external defensives (healer CDs)
+    self:AnalyzeActiveExternals(snapshot, analysis)
+
     -- Find healing gaps
     self:FindHealingGaps(snapshot, analysis)
-    
+
     -- Calculate "would have survived" scenarios
     self:CalculateSurvivalScenarios(snapshot, analysis)
     
@@ -272,6 +275,52 @@ function DA:AnalyzeUnusedDefensives(snapshot, analysis)
     table.sort(analysis.unusedDefensives, function(a, b)
         return a.potentialReduction > b.potentialReduction
     end)
+end
+
+--------------------------------------------------------------------------------
+-- External Defensive Analysis (Healer CDs that were active at death)
+--------------------------------------------------------------------------------
+
+function DA:AnalyzeActiveExternals(snapshot, analysis)
+    analysis.activeExternals = {}
+    analysis.hadExternalAtDeath = false
+
+    local activeExternals = snapshot.activeExternals or {}
+
+    for _, ext in ipairs(activeExternals) do
+        local extInfo = ext.info or {}
+
+        table.insert(analysis.activeExternals, {
+            spellID = ext.spellID,
+            name = extInfo.name or "Unknown",
+            source = ext.source,
+            type = extInfo.type,
+            reduction = extInfo.reduction or 0,
+            remainingDuration = ext.remainingDuration,
+        })
+
+        -- Mark if player had significant external DR at death
+        if extInfo.reduction and extInfo.reduction >= 20 then
+            analysis.hadExternalAtDeath = true
+        end
+        if extInfo.type == "external_immunity" or extInfo.type == "external_cheat" then
+            analysis.hadExternalAtDeath = true
+        end
+    end
+
+    -- Check combat log for externals that were applied during the death window
+    analysis.externalsReceived = {}
+    for _, event in ipairs(snapshot.events) do
+        if event.type == "EXTERNAL_GAIN" and event.externalInfo then
+            table.insert(analysis.externalsReceived, {
+                spellID = event.spellID,
+                name = event.spellName,
+                source = event.source,
+                timestamp = event.timestamp,
+                info = event.externalInfo,
+            })
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -755,6 +804,52 @@ function DA:GenerateVerdict(snapshot, analysis)
     local preDeathModifier = self:CalculatePreDeathHealthModifier(snapshot, analysis)
     score = score + preDeathModifier
     scoreBreakdown.preDeathModifier = preDeathModifier
+
+    -- 8. External Defensive Bonus (healer was helping)
+    local externalBonus = 0
+    scoreBreakdown.externalBonus = 0
+
+    if analysis.hadExternalAtDeath then
+        -- Had healer CD active but still died = more forgiving
+        externalBonus = externalBonus + 0.5
+        table.insert(suggestions, "Had external defensive active - healer was helping")
+    end
+
+    if analysis.externalsReceived and #analysis.externalsReceived > 0 then
+        -- Healer used CDs during death window
+        externalBonus = externalBonus + 0.3
+    end
+
+    score = score + externalBonus
+    scoreBreakdown.externalBonus = externalBonus
+
+    -- 9. M+ Key Level Context
+    local mplusBonus = 0
+    scoreBreakdown.mplusBonus = 0
+
+    if snapshot.mythicPlus and snapshot.mythicPlus.keyLevel then
+        local keyLevel = snapshot.mythicPlus.keyLevel
+        -- Higher keys are more forgiving - damage is just higher
+        if keyLevel >= 15 then
+            mplusBonus = 1.0  -- Significant bonus for high keys
+            table.insert(suggestions, string.format("High key level (+%d) - increased damage is expected", keyLevel))
+        elseif keyLevel >= 10 then
+            mplusBonus = 0.5
+        elseif keyLevel >= 5 then
+            mplusBonus = 0.2
+        end
+    end
+
+    score = score + mplusBonus
+    scoreBreakdown.mplusBonus = mplusBonus
+
+    -- 10. Encounter Context (raid boss = more forgiving)
+    local encounterBonus = 0
+    if snapshot.encounter then
+        encounterBonus = 0.3  -- Raid bosses are expected to be dangerous
+    end
+    score = score + encounterBonus
+    scoreBreakdown.encounterBonus = encounterBonus
 
     -- ========================================================================
     -- FINALIZE SCORE

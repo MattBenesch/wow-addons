@@ -8,19 +8,22 @@
     - Manaforge Omega (8 bosses)
 
     Each entry has:
-    - spellID: The spell ID (verified from mythictrap.com)
+    - spellID: The spell ID (verified from Wowhead encounter journal)
     - name: Display name of the ability
     - avoidance: How to avoid the damage
     - category: "frontal", "ground", "interrupt", "soak", "dodge", "positioning", "add"
     - boss: Which boss this is from
     - raid: Which raid this is from
+    - difficulty: (optional) "heroic", "heroic_change", "mythic", "mythic_change"
+
+    Last verified: December 2025
 ]]
 
 local ADDON_NAME, DA = ...
 
 --------------------------------------------------------------------------------
 -- NERUB-AR PALACE (8 bosses)
--- Spell IDs verified from mythictrap.com
+-- Spell IDs verified from Wowhead encounter journal
 --------------------------------------------------------------------------------
 
 DA.NerubArPalaceMechanics = {
@@ -55,10 +58,17 @@ DA.NerubArPalaceMechanics = {
         boss = "Ulgrax the Devourer",
         raid = "Nerub-ar Palace"
     },
-    [441451] = {
+    [439502] = {
         name = "Stalker's Webbing",
         avoidance = "Break out of webs quickly or avoid getting wrapped",
         category = "dodge",
+        boss = "Ulgrax the Devourer",
+        raid = "Nerub-ar Palace"
+    },
+    [438012] = {
+        name = "Hungering Bellows",
+        avoidance = "Move away from boss during feeding frenzy phase",
+        category = "positioning",
         boss = "Ulgrax the Devourer",
         raid = "Nerub-ar Palace"
     },
@@ -136,6 +146,21 @@ DA.NerubArPalaceMechanics = {
         boss = "The Bloodbound Horror",
         raid = "Nerub-ar Palace"
     },
+    [438696] = {
+        name = "Black Sepsis",
+        avoidance = "Heal through the damage over time, dispel if possible",
+        category = "soak",
+        boss = "The Bloodbound Horror",
+        raid = "Nerub-ar Palace"
+    },
+    [452237] = {
+        name = "Bloodcurdle",
+        avoidance = "Use defensives during this heavy damage phase",
+        category = "soak",
+        boss = "The Bloodbound Horror",
+        raid = "Nerub-ar Palace",
+        difficulty = "mythic"
+    },
 
     --------------------------------------------------------------------------------
     -- Sikran, Captain of the Sureki
@@ -178,6 +203,27 @@ DA.NerubArPalaceMechanics = {
     [459785] = {
         name = "Cosmic Residue",
         avoidance = "Don't stand in the cosmic puddles",
+        category = "ground",
+        boss = "Sikran",
+        raid = "Nerub-ar Palace"
+    },
+    [458272] = {
+        name = "Cosmic Simulacrum",
+        avoidance = "Dodge the ghost copies of Sikran's attacks",
+        category = "dodge",
+        boss = "Sikran",
+        raid = "Nerub-ar Palace"
+    },
+    [459273] = {
+        name = "Cosmic Shards",
+        avoidance = "Avoid the projectile shards",
+        category = "dodge",
+        boss = "Sikran",
+        raid = "Nerub-ar Palace"
+    },
+    [461401] = {
+        name = "Collapsing Nova",
+        avoidance = "Move away from the nova explosion point",
         category = "ground",
         boss = "Sikran",
         raid = "Nerub-ar Palace"
@@ -306,16 +352,30 @@ DA.NerubArPalaceMechanics = {
         boss = "Nexus-Princess Ky'veza",
         raid = "Nerub-ar Palace"
     },
-    [435414] = {
+    [435405] = {
         name = "Starless Night",
         avoidance = "Dodge rotating cones, stay in safe zones",
         category = "dodge",
         boss = "Nexus-Princess Ky'veza",
         raid = "Nerub-ar Palace"
     },
-    [435486] = {
-        name = "Regicide",
-        avoidance = "Use immunities or major defensives",
+    [436749] = {
+        name = "Reaper",
+        avoidance = "Move away from the Reaper's path during Starless Night",
+        category = "dodge",
+        boss = "Nexus-Princess Ky'veza",
+        raid = "Nerub-ar Palace"
+    },
+    [436950] = {
+        name = "Stalking Shadows",
+        avoidance = "Watch for and dodge the shadow attacks",
+        category = "dodge",
+        boss = "Nexus-Princess Ky'veza",
+        raid = "Nerub-ar Palace"
+    },
+    [437343] = {
+        name = "Queensbane",
+        avoidance = "Dispel or heal through the debuff quickly",
         category = "soak",
         boss = "Nexus-Princess Ky'veza",
         raid = "Nerub-ar Palace"
@@ -345,10 +405,10 @@ DA.NerubArPalaceMechanics = {
         boss = "The Silken Court",
         raid = "Nerub-ar Palace"
     },
-    [438656] = {
-        name = "Venomous Rain",
-        avoidance = "Move out of the poison rain zones",
-        category = "ground",
+    [438677] = {
+        name = "Stinging Swarm",
+        avoidance = "Stun/interrupt the swarm, avoid getting hit",
+        category = "add",
         boss = "The Silken Court",
         raid = "Nerub-ar Palace"
     },
@@ -359,10 +419,24 @@ DA.NerubArPalaceMechanics = {
         boss = "The Silken Court",
         raid = "Nerub-ar Palace"
     },
-    [438677] = {
-        name = "Stinging Swarm",
-        avoidance = "Stun/interrupt the swarm, avoid the damage",
-        category = "add",
+    [440246] = {
+        name = "Reckless Charge",
+        avoidance = "Move out of Anub'arash's charge path",
+        category = "dodge",
+        boss = "The Silken Court",
+        raid = "Nerub-ar Palace"
+    },
+    [451277] = {
+        name = "Spike Storm",
+        avoidance = "Avoid the spike projectiles from Anub'arash",
+        category = "dodge",
+        boss = "The Silken Court",
+        raid = "Nerub-ar Palace"
+    },
+    [443068] = {
+        name = "Spike Eruption",
+        avoidance = "Move away from the eruption zones",
+        category = "ground",
         boss = "The Silken Court",
         raid = "Nerub-ar Palace"
     },
@@ -387,14 +461,6 @@ DA.NerubArPalaceMechanics = {
         boss = "The Silken Court",
         raid = "Nerub-ar Palace"
     },
-    [440158] = {
-        name = "Reckless Charge",
-        avoidance = "Move out of the charge path",
-        category = "dodge",
-        boss = "The Silken Court",
-        raid = "Nerub-ar Palace"
-    },
-
     --------------------------------------------------------------------------------
     -- Queen Ansurek
     --------------------------------------------------------------------------------
@@ -468,11 +534,39 @@ DA.NerubArPalaceMechanics = {
         boss = "Queen Ansurek",
         raid = "Nerub-ar Palace"
     },
+    [438846] = {
+        name = "Reactive Froth",
+        avoidance = "Spread to avoid chain damage from Reactive Toxin",
+        category = "positioning",
+        boss = "Queen Ansurek",
+        raid = "Nerub-ar Palace"
+    },
+    [447076] = {
+        name = "Predation",
+        avoidance = "Avoid the Queen's hunting phase attacks",
+        category = "dodge",
+        boss = "Queen Ansurek",
+        raid = "Nerub-ar Palace"
+    },
+    [439299] = {
+        name = "Web Blades",
+        avoidance = "Dodge the blade projectiles",
+        category = "dodge",
+        boss = "Queen Ansurek",
+        raid = "Nerub-ar Palace"
+    },
+    [443888] = {
+        name = "Abyssal Infusion",
+        avoidance = "Handle the debuff before it kills you",
+        category = "soak",
+        boss = "Queen Ansurek",
+        raid = "Nerub-ar Palace"
+    },
 }
 
 --------------------------------------------------------------------------------
 -- LIBERATION OF UNDERMINE (8 bosses)
--- Spell IDs verified from mythictrap.com
+-- Spell IDs verified from Wowhead encounter journal
 --------------------------------------------------------------------------------
 
 DA.LiberationOfUndermineMechanics = {
@@ -518,6 +612,27 @@ DA.LiberationOfUndermineMechanics = {
         name = "Oil Slicks",
         avoidance = "Don't stand in oil puddles - they ignite",
         category = "ground",
+        boss = "Vexie and the Geargrinders",
+        raid = "Liberation of Undermine"
+    },
+    [459943] = {
+        name = "Call Bikers",
+        avoidance = "Prepare to dodge incoming biker charge paths",
+        category = "dodge",
+        boss = "Vexie and the Geargrinders",
+        raid = "Liberation of Undermine"
+    },
+    [459453] = {
+        name = "Blaze of Glory",
+        avoidance = "Move away from the burning motorcycle",
+        category = "ground",
+        boss = "Vexie and the Geargrinders",
+        raid = "Liberation of Undermine"
+    },
+    [459974] = {
+        name = "Bomb Voyage!",
+        avoidance = "Dodge the bomb explosions across the arena",
+        category = "dodge",
         boss = "Vexie and the Geargrinders",
         raid = "Liberation of Undermine"
     },
@@ -748,6 +863,34 @@ DA.LiberationOfUndermineMechanics = {
         boss = "The One-Armed Bandit",
         raid = "Liberation of Undermine"
     },
+    [460474] = {
+        name = "Shocking Field",
+        avoidance = "Move out of the electric field after tank hit",
+        category = "ground",
+        boss = "The One-Armed Bandit",
+        raid = "Liberation of Undermine"
+    },
+    [461068] = {
+        name = "Fraud Detected!",
+        avoidance = "Avoid triggering the fraud detection mechanic",
+        category = "positioning",
+        boss = "The One-Armed Bandit",
+        raid = "Liberation of Undermine"
+    },
+    [465580] = {
+        name = "Scattered Payout",
+        avoidance = "Dodge the scattered gold during Stage 2",
+        category = "dodge",
+        boss = "The One-Armed Bandit",
+        raid = "Liberation of Undermine"
+    },
+    [465587] = {
+        name = "Explosive Jackpot",
+        avoidance = "Move away from the explosive coins",
+        category = "ground",
+        boss = "The One-Armed Bandit",
+        raid = "Liberation of Undermine"
+    },
 
     --------------------------------------------------------------------------------
     -- Mug'Zee, Heads of Security
@@ -815,6 +958,27 @@ DA.LiberationOfUndermineMechanics = {
         boss = "Mug'Zee, Heads of Security",
         raid = "Liberation of Undermine",
         difficulty = "mythic"
+    },
+    [466516] = {
+        name = "Stormfury Cloud",
+        avoidance = "Move out of the electric cloud zones",
+        category = "ground",
+        boss = "Mug'Zee, Heads of Security",
+        raid = "Liberation of Undermine"
+    },
+    [467202] = {
+        name = "Golden Drip",
+        avoidance = "Avoid standing in molten gold puddles",
+        category = "ground",
+        boss = "Mug'Zee, Heads of Security",
+        raid = "Liberation of Undermine"
+    },
+    [468658] = {
+        name = "Elemental Carnage",
+        avoidance = "Use heavy defensives during this phase",
+        category = "soak",
+        boss = "Mug'Zee, Heads of Security",
+        raid = "Liberation of Undermine"
     },
 
     --------------------------------------------------------------------------------
@@ -890,21 +1054,49 @@ DA.LiberationOfUndermineMechanics = {
         boss = "Chrome King Gallywix",
         raid = "Liberation of Undermine"
     },
+    [1214607] = {
+        name = "Bigger Badder Bomb Blast",
+        avoidance = "Move far away from enhanced bomb explosions",
+        category = "ground",
+        boss = "Chrome King Gallywix",
+        raid = "Liberation of Undermine"
+    },
+    [466751] = {
+        name = "Venting Heat",
+        avoidance = "Avoid the venting steam zones",
+        category = "ground",
+        boss = "Chrome King Gallywix",
+        raid = "Liberation of Undermine"
+    },
+    [467182] = {
+        name = "Suppression",
+        avoidance = "Use defensives during suppression phase",
+        category = "soak",
+        boss = "Chrome King Gallywix",
+        raid = "Liberation of Undermine"
+    },
 }
 
 --------------------------------------------------------------------------------
 -- MANAFORGE OMEGA (8 bosses)
--- Spell IDs verified from mythictrap.com
+-- Spell IDs verified from Wowhead encounter journal
 --------------------------------------------------------------------------------
 
 DA.ManaforgeOmegaMechanics = {
     --------------------------------------------------------------------------------
     -- Plexus Sentinel
     --------------------------------------------------------------------------------
-    [1218626] = {
+    [1219450] = {
         name = "Manifest Matrices",
         avoidance = "Drop circles against room walls, avoid stacking them in center",
         category = "ground",
+        boss = "Plexus Sentinel",
+        raid = "Manaforge Omega"
+    },
+    [1218625] = {
+        name = "Displacement Matrix",
+        avoidance = "Prepare for forced movement, avoid hazards",
+        category = "positioning",
         boss = "Plexus Sentinel",
         raid = "Manaforge Omega"
     },
@@ -915,14 +1107,21 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Plexus Sentinel",
         raid = "Manaforge Omega"
     },
-    [1229762] = {
+    [1219531] = {
         name = "Eradicating Salvo",
         avoidance = "Stack 5+ players to split missile damage, avoid knockback into hazards",
         category = "soak",
         boss = "Plexus Sentinel",
         raid = "Manaforge Omega"
     },
-    [1217649] = {
+    [1220489] = {
+        name = "Protocol: Purge",
+        avoidance = "Follow the boss movement pattern to avoid purge damage",
+        category = "dodge",
+        boss = "Plexus Sentinel",
+        raid = "Manaforge Omega"
+    },
+    [1234733] = {
         name = "Cleanse the Chamber",
         avoidance = "Use extra action button to cross the moving wall of lethal energy",
         category = "dodge",
@@ -930,14 +1129,14 @@ DA.ManaforgeOmegaMechanics = {
         raid = "Manaforge Omega",
         difficulty = "mythic"
     },
-    [1227794] = {
-        name = "Arcane Lightning",
+    [1233110] = {
+        name = "Purging Lightning",
         avoidance = "Dodge the lightning strike circles in the tunnel",
         category = "dodge",
         boss = "Plexus Sentinel",
         raid = "Manaforge Omega"
     },
-    [1218669] = {
+    [1218668] = {
         name = "Energy Cutter",
         avoidance = "Dodge rotating beams and knockback orbs, use extra action button",
         category = "dodge",
@@ -976,7 +1175,7 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Loom'ithar",
         raid = "Manaforge Omega"
     },
-    [1226311] = {
+    [1226315] = {
         name = "Infusion Tether",
         avoidance = "Move 40 yards to break tether, avoid breaking it in web pools",
         category = "positioning",
@@ -1031,10 +1230,17 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Soulbinder Naazindhri",
         raid = "Manaforge Omega"
     },
-    [1242088] = {
+    [1223859] = {
         name = "Arcane Expulsion",
         avoidance = "Position to avoid knockback into orbs or off platform edge",
         category = "positioning",
+        boss = "Soulbinder Naazindhri",
+        raid = "Manaforge Omega"
+    },
+    [1226827] = {
+        name = "Soulrend Orb",
+        avoidance = "Dodge the orbs traveling across the platform",
+        category = "dodge",
         boss = "Soulbinder Naazindhri",
         raid = "Manaforge Omega"
     },
@@ -1070,10 +1276,17 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Forgeweaver Araz",
         raid = "Manaforge Omega"
     },
-    [1231720] = {
-        name = "Invoke Collector",
-        avoidance = "Dodge orbs as they traverse the arena from pylons",
-        category = "dodge",
+    [1231726] = {
+        name = "Arcane Barrier",
+        avoidance = "Break through the barrier to reach the boss",
+        category = "positioning",
+        boss = "Forgeweaver Araz",
+        raid = "Manaforge Omega"
+    },
+    [1228218] = {
+        name = "Arcane Obliteration",
+        avoidance = "Move away from the heavy damage zone",
+        category = "ground",
         boss = "Forgeweaver Araz",
         raid = "Manaforge Omega"
     },
@@ -1181,6 +1394,27 @@ DA.ManaforgeOmegaMechanics = {
         boss = "The Soul Hunters",
         raid = "Manaforge Omega"
     },
+    [1227113] = {
+        name = "Infernal Strike",
+        avoidance = "Dodge the landing zone of the infernal strike",
+        category = "ground",
+        boss = "The Soul Hunters",
+        raid = "Manaforge Omega"
+    },
+    [1218103] = {
+        name = "Eye Beam",
+        avoidance = "Move out of the eye beam path immediately",
+        category = "frontal",
+        boss = "The Soul Hunters",
+        raid = "Manaforge Omega"
+    },
+    [1225154] = {
+        name = "Immolation Aura",
+        avoidance = "Stay away from bosses with active auras",
+        category = "ground",
+        boss = "The Soul Hunters",
+        raid = "Manaforge Omega"
+    },
 
     --------------------------------------------------------------------------------
     -- Fractillus
@@ -1214,9 +1448,23 @@ DA.ManaforgeOmegaMechanics = {
         raid = "Manaforge Omega"
     },
     [1226089] = {
-        name = "Nexus Wall",
+        name = "Crystal Nexus",
         avoidance = "Position walls carefully to avoid blocking escape routes",
         category = "positioning",
+        boss = "Fractillus",
+        raid = "Manaforge Omega"
+    },
+    [1227676] = {
+        name = "Shard Slam",
+        avoidance = "Move away from the slam impact zones",
+        category = "ground",
+        boss = "Fractillus",
+        raid = "Manaforge Omega"
+    },
+    [1227378] = {
+        name = "Crystal Encasement",
+        avoidance = "Break encased players free quickly",
+        category = "add",
         boss = "Fractillus",
         raid = "Manaforge Omega"
     },
@@ -1231,15 +1479,15 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Nexus-King Salhadaar",
         raid = "Manaforge Omega"
     },
-    [1227330] = {
-        name = "Besiege",
+    [1225016] = {
+        name = "Command: Besiege",
         avoidance = "Dodge laser beams crossing platform, bait beams away from boss on Mythic",
         category = "dodge",
         boss = "Nexus-King Salhadaar",
         raid = "Manaforge Omega"
     },
-    [1224827] = {
-        name = "Behead",
+    [1225010] = {
+        name = "Command: Behead",
         avoidance = "Spread behind raid, dodge knockback direction, avoid platform edges",
         category = "positioning",
         boss = "Nexus-King Salhadaar",
@@ -1266,10 +1514,24 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Nexus-King Salhadaar",
         raid = "Manaforge Omega"
     },
-    [1226347] = {
+    [1226024] = {
         name = "Starkiller Swing",
         avoidance = "Position missiles toward stars to destroy them, dodge other missiles",
         category = "positioning",
+        boss = "Nexus-King Salhadaar",
+        raid = "Manaforge Omega"
+    },
+    [1226042] = {
+        name = "Starkiller Nova",
+        avoidance = "Move away from the star explosion zones",
+        category = "ground",
+        boss = "Nexus-King Salhadaar",
+        raid = "Manaforge Omega"
+    },
+    [1225319] = {
+        name = "Galactic Smash",
+        avoidance = "Move out of the smash impact zone",
+        category = "ground",
         boss = "Nexus-King Salhadaar",
         raid = "Manaforge Omega"
     },
@@ -1364,6 +1626,34 @@ DA.ManaforgeOmegaMechanics = {
         boss = "Dimensius the All-Devouring",
         raid = "Manaforge Omega",
         difficulty = "heroic"
+    },
+    [1229038] = {
+        name = "Devour",
+        avoidance = "Use defensive cooldowns during devour phase",
+        category = "soak",
+        boss = "Dimensius the All-Devouring",
+        raid = "Manaforge Omega"
+    },
+    [1229327] = {
+        name = "Oblivion",
+        avoidance = "Move away from oblivion zones",
+        category = "ground",
+        boss = "Dimensius the All-Devouring",
+        raid = "Manaforge Omega"
+    },
+    [1232987] = {
+        name = "Black Hole",
+        avoidance = "Stay away from the black hole pull zone",
+        category = "positioning",
+        boss = "Dimensius the All-Devouring",
+        raid = "Manaforge Omega"
+    },
+    [1231716] = {
+        name = "Extinguish The Stars",
+        avoidance = "Focus down stars before they explode",
+        category = "add",
+        boss = "Dimensius the All-Devouring",
+        raid = "Manaforge Omega"
     },
 }
 
